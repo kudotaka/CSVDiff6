@@ -84,12 +84,43 @@ public class CsvApp : ConsoleAppBase
         }
 
         //INPUT
+        string mode = config.Value.Mode;
+        string dataKeyColumnName = config.Value.DataKeyColumnName;
+        string targetColmunsName = config.Value.TargetColmunsName;
+        if (String.IsNullOrEmpty(mode) || mode.CompareTo("DEFAULT") == 0)
+        {
+            logger.ZLogError($"ReadCsvFile|mode is empty/default value. Check to appsettings.json.");
+            return 1;
+        }
+        else if ( mode.CompareTo("mode-column") != 0 && mode.CompareTo("mode-datakey") != 0)
+        {
+            logger.ZLogError($"ReadCsvFile|mode is not [mode-column]/[mode-datakey] value. Check to appsettings.json.");
+            return 1;
+        }
+        if (String.IsNullOrEmpty(dataKeyColumnName) || dataKeyColumnName.CompareTo("DEFAULT") == 0)
+        {
+            logger.ZLogError($"ReadCsvFile|dataKeyColumnName is empty/default value. Check to appsettings.json.");
+            return 1;
+        }
+        if (String.IsNullOrEmpty(targetColmunsName) || targetColmunsName.CompareTo("DEFAULT") == 0)
+        {
+            logger.ZLogError($"ReadCsvFile|targetColmunsName is empty/default value. Check to appsettings.json.");
+            return 1;
+        }
+        logger.ZLogDebug($"ReadCsvFile|mode:{mode} dataKeyColumnName:{dataKeyColumnName} targetColmunsName:{targetColmunsName} ");
         
         //OUTPUT
+        List<string> targetHeader = new List<string>();
         List<string> inHeader = new List<string>();
         Dictionary<string, Dictionary<string, string>> inDict1 = new Dictionary<string, Dictionary<string, string>>();
         Dictionary<string, Dictionary<string, string>> inDict2 = new Dictionary<string, Dictionary<string, string>>();
 
+
+        putStringToListHeader(targetColmunsName, targetHeader);
+        for (int i = 0; i < targetHeader.Count; i++)
+        {
+            logger.ZLogTrace($"ReadCsvFile|targetHeader header:{i+1} = {targetHeader[i]}");
+        }
 
         putCsvToListHeader(incsv2, inHeader);
         for (int i = 0; i < inHeader.Count; i++)
@@ -97,7 +128,7 @@ public class CsvApp : ConsoleAppBase
             logger.ZLogTrace($"ReadCsvFile|csv:{incsv2} header:{i+1} = {inHeader[i]}");
         }
 
-        putCsvToDictinayData(incsv1, "拠点番号", inDict1);
+        putCsvToDictinayData(incsv1, dataKeyColumnName, inDict1);
         logger.ZLogDebug($"ReadCsvFile|csv:{incsv1} data count = {inDict1.Keys.Count}");
         foreach (var datakey in inDict1.Keys)
         {
@@ -106,7 +137,7 @@ public class CsvApp : ConsoleAppBase
                 logger.ZLogTrace($"ReadCsvFile|csv:{incsv1} data:{datakey} {key} = {(inDict1[datakey])[key]}");
             }
         }
-        putCsvToDictinayData(incsv2, "拠点番号", inDict2);
+        putCsvToDictinayData(incsv2, dataKeyColumnName, inDict2);
         logger.ZLogDebug($"ReadCsvFile|csv:{incsv2} data count = {inDict2.Keys.Count}");
         foreach (var datakey in inDict2.Keys)
         {
@@ -150,7 +181,7 @@ public class CsvApp : ConsoleAppBase
         }
 
         //result
-        string[] targetColmuns = {"開始日予定","終了日予定","開始日実績","終了日実績"};
+        string[] targetColmuns = targetHeader.ToArray<string>();
         Dictionary<UInt32, Dictionary<string, string>> resultDict = new Dictionary<UInt32, Dictionary<string, string>>();
         UInt32 countKeys = 1;
         foreach (var targetColumn in targetColmuns)
@@ -173,83 +204,79 @@ public class CsvApp : ConsoleAppBase
             }
         }
 
-        //result[column]
-        logger.ZLogInformation($"==result[column]==");
-        logger.ZLogInformation($"csv1:{incsv1}");
-        logger.ZLogInformation($"csv2:{incsv2}");
-        foreach (var targetColumn in targetColmuns)
+        if (mode.CompareTo("mode-column") == 0 )
         {
-            logger.ZLogInformation($"column:{targetColumn}");
-            Boolean isNotContains = true;
-            foreach (var key in resultDict.Keys)
+            //result[column]
+            logger.ZLogInformation($"==result[column]==");
+            logger.ZLogInformation($"csv1:{incsv1}");
+            logger.ZLogInformation($"csv2:{incsv2}");
+            foreach (var targetColumn in targetColmuns)
             {
-                if (resultDict[key].ContainsValue(targetColumn))
+                logger.ZLogInformation($"column:{targetColumn}");
+                Boolean isNotContains = true;
+                foreach (var key in resultDict.Keys)
                 {
-                    isNotContains = false;
-                    logger.ZLogInformation($"  datakey:{(resultDict[key])["datakey"]} {(resultDict[key])["previous"]} => {(resultDict[key])["current"]}");
+                    if (resultDict[key].ContainsValue(targetColumn))
+                    {
+                        isNotContains = false;
+                        logger.ZLogInformation($"  datakey:{(resultDict[key])["datakey"]} {(resultDict[key])["previous"]} => {(resultDict[key])["current"]}");
+                    }
+                    else
+                    {
+                    }
                 }
-                else
-                {
-                }
-            }
 
-            if (isNotContains)
-            {
-                logger.ZLogInformation($"  NO CHANGE.");
+                if (isNotContains)
+                {
+                    logger.ZLogInformation($"  NO CHANGE.");
+                }
             }
         }
 
-        //result[datakey]
-        logger.ZLogInformation($"==result[datakey]==");
-        logger.ZLogInformation($"csv1:{incsv1}");
-        logger.ZLogInformation($"csv2:{incsv2}");
-        foreach (var datakey in updateAll.Keys)
+        if (mode.CompareTo("mode-datakey") == 0 )
         {
-            Boolean isContains = false;
-            foreach (var targetColumn in targetColmuns)
+            //result[datakey]
+            logger.ZLogInformation($"==result[datakey]==");
+            logger.ZLogInformation($"csv1:{incsv1}");
+            logger.ZLogInformation($"csv2:{incsv2}");
+            foreach (var datakey in updateAll.Keys)
             {
-                if (updateAll[datakey].Contains(targetColumn))
-                {
-                    isContains = true;
-                }
-            }
-
-            if (isContains)
-            {
-                logger.ZLogInformation($"datakey:{datakey}");
+                Boolean isContains = false;
                 foreach (var targetColumn in targetColmuns)
                 {
                     if (updateAll[datakey].Contains(targetColumn))
                     {
-                        var dictDataPrevious = inDict1[datakey];
-                        var dictDataCurrent = inDict2[datakey];
+                        isContains = true;
+                    }
+                }
 
+                if (isContains)
+                {
+                    logger.ZLogInformation($"datakey:{datakey}");
+                    foreach (var targetColumn in targetColmuns)
+                    {
                         if (updateAll[datakey].Contains(targetColumn))
                         {
-                            logger.ZLogInformation($"  column:{targetColumn} {dictDataPrevious[targetColumn]} => {dictDataCurrent[targetColumn]}");
+                            var dictDataPrevious = inDict1[datakey];
+                            var dictDataCurrent = inDict2[datakey];
+
+                            if (updateAll[datakey].Contains(targetColumn))
+                            {
+                                logger.ZLogInformation($"  column:{targetColumn} {dictDataPrevious[targetColumn]} => {dictDataCurrent[targetColumn]}");
+                            }
                         }
                     }
                 }
             }
         }
 
-
         logger.ZLogDebug($"ReadCsvFile|end!");
         return 0;
     }
 
-/*
-    //ReadCsv backup
-    [Command("readcsvfile")]
-    public int ReadCsvFile(string incsv)
-    {
-        logger.ZLogDebug($"ReadCsvFile|start!");
-        if (string.IsNullOrEmpty(incsv))
-        {
-            logger.ZLogError($"Error: arg is NullOrEmpty.");
-            return 1;
-        }
 
+    private int putStringToListHeader(string instring, List<string> outlist)
+    {
         var readCsvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
             HasHeaderRecord = true,
@@ -260,9 +287,8 @@ public class CsvApp : ConsoleAppBase
         };
 
         string[] headers = {};
-        UInt32 currentRowPosition = 0;
-        using (var csvStreamReader = new StreamReader(incsv, Encoding.UTF8))
-        using (var csvReader = new CsvReader(csvStreamReader, readCsvConfig))
+        using (var csvStringReader = new StringReader(instring))
+        using (var csvReader = new CsvReader(csvStringReader, readCsvConfig))
         {
             // header : true/false
             if (true)
@@ -272,28 +298,13 @@ public class CsvApp : ConsoleAppBase
                 headers = csvReader.HeaderRecord;
                 for (int i = 0; i < headers.Length; i++)
                 {
-                    logger.ZLogDebug($"ReadCsvFile|header colmun{i+1} = {headers[i]}");
+                    outlist.Add(headers[i]);
                 }
             }
-
-            while (csvReader.Read())
-            {
-                currentRowPosition++;
-                string[] record = csvReader.Parser.Record;
-                for (int i = 0; i < record.Length; i++)
-                {
-                    logger.ZLogDebug($"ReadCsvFile|data row{currentRowPosition} colmun{i+1} = {record[i]}");
-                }
-            }
-
-
         }
 
-        logger.ZLogDebug($"ReadCsvFile|end!");
         return 0;
     }
-*/
-
 
     private int putCsvToListHeader(string incsv, List<string> outlist)
     {
@@ -406,4 +417,6 @@ public class CsvApp : ConsoleAppBase
 public class MyConfig
 {
     public string Mode {get; set;} = "DEFAULT";
+    public string DataKeyColumnName {get; set;} = "DEFAULT";
+    public string TargetColmunsName {get; set;} = "DEFAULT";
 }
