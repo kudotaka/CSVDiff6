@@ -1,0 +1,13 @@
+﻿==Changes[column](2024-06-01T21:23:34+00:00)==
+Previous(csv1):sample1.csv
+Current(csv2) :sample2.csv
+column:開始日予定
+  拠点番号:3
+column:終了日予定
+  拠点番号:2-1,3
+column:開始日実績
+  NO CHANGE.
+column:終了日実績
+  NO CHANGE.
+column:memo
+  拠点番号:1,4

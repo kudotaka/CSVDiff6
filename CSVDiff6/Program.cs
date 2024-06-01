@@ -74,15 +74,18 @@ public class CsvApp : ConsoleAppBase
 
     //ReadCsv
     [Command("readcsvfile")]
-    public int ReadCsvFile(string incsv1, string incsv2)
+    public int ReadCsvFile(string incsv1, string incsv2, string outfile1)
     {
         logger.ZLogDebug($"ReadCsvFile|start!");
-        if (string.IsNullOrEmpty(incsv1) || string.IsNullOrEmpty(incsv2))
+        if (string.IsNullOrEmpty(incsv1) || string.IsNullOrEmpty(incsv2)
+        || string.IsNullOrEmpty(outfile1))
         {
             logger.ZLogError($"Error: arg is NullOrEmpty.");
             return 1;
         }
 
+        var outputEncodeing = Encoding.UTF8;
+        string outputNewLine = "\r\n";
         //INPUT
         string mode = config.Value.Mode;
         string dataKeyColumnName = config.Value.DataKeyColumnName;
@@ -204,65 +207,91 @@ public class CsvApp : ConsoleAppBase
             }
         }
 
-        if (mode.CompareTo("mode-column") == 0 )
+        if (File.Exists(outfile1))
         {
-            //result[column]
-            logger.ZLogInformation($"==result[column]==");
-            logger.ZLogInformation($"csv1:{incsv1}");
-            logger.ZLogInformation($"csv2:{incsv2}");
-            foreach (var targetColumn in targetColmuns)
+            File.Delete(outfile1);
+        }
+        using (var stream = File.OpenWrite(outfile1))
+        using (var writerWriter = new StreamWriter(stream, outputEncodeing))
+        {
+            writerWriter.NewLine = outputNewLine;
+
+            if (mode.CompareTo("mode-column") == 0 )
             {
-                logger.ZLogInformation($"column:{targetColumn}");
-                Boolean isNotContains = true;
-                foreach (var key in resultDict.Keys)
+                //result[column]
+                logger.ZLogInformation($"==Changes[column]==");
+                logger.ZLogInformation($"csv1:{incsv1}");
+                logger.ZLogInformation($"csv2:{incsv2}");
+                writerWriter.WriteLine($"==Changes[column]({getTime()})==");
+                writerWriter.WriteLine($"Previous(csv1):{incsv1}");
+                writerWriter.WriteLine($"Current(csv2) :{incsv2}");
+                foreach (var targetColumn in targetColmuns)
                 {
-                    if (resultDict[key].ContainsValue(targetColumn))
+                    logger.ZLogInformation($"column:{targetColumn}");
+                    writerWriter.WriteLine($"column:{targetColumn}");
+                    Boolean isNotContains = true;
+                    List<string> datakeys = new List<string>();
+                    foreach (var key in resultDict.Keys)
                     {
-                        isNotContains = false;
-                        logger.ZLogInformation($"  datakey:{(resultDict[key])["datakey"]} {(resultDict[key])["previous"]} => {(resultDict[key])["current"]}");
+                        if (resultDict[key].ContainsValue(targetColumn))
+                        {
+                            isNotContains = false;
+                            logger.ZLogInformation($"  datakey:{(resultDict[key])["datakey"]} {(resultDict[key])["previous"]} => {(resultDict[key])["current"]}");
+                            datakeys.Add((resultDict[key])["datakey"]);
+                        }
+                        else
+                        {
+                        }
+                    }
+
+                    if (isNotContains)
+                    {
+                        logger.ZLogInformation($"  NO CHANGE.");
+                        writerWriter.WriteLine($"  NO CHANGE.");
                     }
                     else
                     {
+                        writerWriter.WriteLine($"  {dataKeyColumnName}:{string.Join (",", datakeys.ToArray<string>())}");
                     }
-                }
-
-                if (isNotContains)
-                {
-                    logger.ZLogInformation($"  NO CHANGE.");
                 }
             }
-        }
 
-        if (mode.CompareTo("mode-datakey") == 0 )
-        {
-            //result[datakey]
-            logger.ZLogInformation($"==result[datakey]==");
-            logger.ZLogInformation($"csv1:{incsv1}");
-            logger.ZLogInformation($"csv2:{incsv2}");
-            foreach (var datakey in updateAll.Keys)
+            if (mode.CompareTo("mode-datakey") == 0 )
             {
-                Boolean isContains = false;
-                foreach (var targetColumn in targetColmuns)
+                //result[datakey]
+                logger.ZLogInformation($"==Changes[datakey]==");
+                logger.ZLogInformation($"csv1:{incsv1}");
+                logger.ZLogInformation($"csv2:{incsv2}");
+                writerWriter.WriteLine($"==Changes[datakey]({getTime()})==");
+                writerWriter.WriteLine($"Previous(csv1):{incsv1}");
+                writerWriter.WriteLine($"Current(csv2) :{incsv2}");
+                foreach (var datakey in updateAll.Keys)
                 {
-                    if (updateAll[datakey].Contains(targetColumn))
-                    {
-                        isContains = true;
-                    }
-                }
-
-                if (isContains)
-                {
-                    logger.ZLogInformation($"datakey:{datakey}");
+                    Boolean isContains = false;
                     foreach (var targetColumn in targetColmuns)
                     {
                         if (updateAll[datakey].Contains(targetColumn))
                         {
-                            var dictDataPrevious = inDict1[datakey];
-                            var dictDataCurrent = inDict2[datakey];
+                            isContains = true;
+                        }
+                    }
 
+                    if (isContains)
+                    {
+                        logger.ZLogInformation($"datakey:{datakey}");
+                        writerWriter.WriteLine($"{dataKeyColumnName}:{datakey}");
+                        foreach (var targetColumn in targetColmuns)
+                        {
                             if (updateAll[datakey].Contains(targetColumn))
                             {
-                                logger.ZLogInformation($"  column:{targetColumn} {dictDataPrevious[targetColumn]} => {dictDataCurrent[targetColumn]}");
+                                var dictDataPrevious = inDict1[datakey];
+                                var dictDataCurrent = inDict2[datakey];
+
+                                if (updateAll[datakey].Contains(targetColumn))
+                                {
+                                    logger.ZLogInformation($"  column:{targetColumn} {dictDataPrevious[targetColumn]} => {dictDataCurrent[targetColumn]}");
+                                    writerWriter.WriteLine($"  column:{targetColumn}");
+                                }
                             }
                         }
                     }
@@ -274,6 +303,11 @@ public class CsvApp : ConsoleAppBase
         return 0;
     }
 
+    private string getTime()
+    {
+        var jstTimeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, jstTimeZoneInfo).ToString("yyyy-MM-dd'T'HH:mm:sszzz");
+    }
 
     private int putStringToListHeader(string instring, List<string> outlist)
     {
